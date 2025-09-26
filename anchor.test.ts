@@ -12,21 +12,20 @@ describe("my-token-program", () => {
   const program = anchor.workspace.MyTokenProgram as Program<MyTokenProgram>;
   let mint: Keypair;
   let userTokenAccount: anchor.web3.PublicKey;
-  let user2: Keypair;
-  let user2TokenAccount: anchor.web3.PublicKey;
+  let secondTokenAccount: anchor.web3.PublicKey;
 
   beforeEach(async () => {
     mint = Keypair.generate();
-    user2 = Keypair.generate();
     
     userTokenAccount = getAssociatedTokenAddressSync(
       mint.publicKey,
       provider.wallet.publicKey
     );
-    
-    user2TokenAccount = getAssociatedTokenAddressSync(
+
+    const tempKeypair = Keypair.generate();
+    secondTokenAccount = getAssociatedTokenAddressSync(
       mint.publicKey,
-      user2.publicKey
+      tempKeypair.publicKey
     );
   });
 
@@ -144,25 +143,24 @@ describe("my-token-program", () => {
       })
       .rpc();
 
-    const airdropTx = await provider.connection.requestAirdrop(
-      user2.publicKey,
-      anchor.web3.LAMPORTS_PER_SOL
+    const tempKeypair = Keypair.generate();
+    const tempTokenAccount = getAssociatedTokenAddressSync(
+      mint.publicKey,
+      tempKeypair.publicKey
     );
-    await provider.connection.confirmTransaction(airdropTx);
 
     await program.methods
       .createTokenAccount()
       .accounts({
-        tokenAccount: user2TokenAccount,
+        tokenAccount: tempTokenAccount,
         mint: mint.publicKey,
-        owner: user2.publicKey,
-        payer: user2.publicKey,
+        owner: tempKeypair.publicKey,
+        payer: provider.wallet.publicKey,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
-      .signers([user2])
       .rpc();
 
     const mintAmount = new anchor.BN(1000000);
@@ -181,7 +179,7 @@ describe("my-token-program", () => {
       .transferTokens(transferAmount)
       .accounts({
         from: userTokenAccount,
-        to: user2TokenAccount,
+        to: tempTokenAccount,
         authority: provider.wallet.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
@@ -189,4 +187,42 @@ describe("my-token-program", () => {
 
     console.log("Transfer tokens tx:", tx);
   });
+
+  it("Burn tokens", async () => {
+    await program.methods
+      .createToken()
+      .accounts({
+        mint: mint.publicKey,
+        authority: provider.wallet.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+      })
+      .signers([mint])
+      .rpc();
+
+    await program.methods
+      .createTokenAccount()
+      .accounts({
+        tokenAccount: userTokenAccount,
+        mint: mint.publicKey,
+        owner: provider.wallet.publicKey,
+        payer: provider.wallet.publicKey,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+      })
+      .rpc();
+
+    const mintAmount = new anchor.BN(1000000);
+    await program.methods
+      .mintTokens(mintAmount)
+      .accounts({
+        mint: mint.publicKey,
+        tokenAccount: userTokenAccount,
+        authority: provider.wallet.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
 });
