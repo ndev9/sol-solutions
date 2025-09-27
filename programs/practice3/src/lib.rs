@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token, TokenAccount};
+use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
-declare_id!("11111111111111111111111111111");
+declare_id!("54snxCn8G2MTUpi9hPo7JAKgGvq1yCRccmQHVpH7xkZu");
 
 #[program]
 pub mod token_escrow {
@@ -16,6 +16,23 @@ pub mod token_escrow {
         escrow.amount = amount;
         escrow.is_completed = false;
 
+        Ok(())
+    }
+
+    pub fn deposit_tokens(ctx: Context<DepositTokens>) -> Result<()> {
+        let escrow = &ctx.accounts.escrow;
+
+        require!(!escrow.is_completed, EscrowError::AlreadyCompleted);
+
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.sender_token_account.to_account_info(),
+            to: ctx.accounts.escrow_vault.to_account_info(),
+            authority: ctx.accounts.sender.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
+        token::transfer(cpi_ctx, escrow.amount)?;
+
+        msg!("Deposited {} tokens to escrow", escrow.amount);
         Ok(())
     }
 }
@@ -56,4 +73,35 @@ pub struct CreateEscrow<'info> {
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+pub struct DepositTokens<'info> {
+    #[account(
+        mut,
+        seeds = [b"escrow", escrow.sender.as_ref(), escrow.receiver.as_ref(), escrow.mint.as_ref()],
+        bump
+    )]
+    pub escrow: Account<'info, EscrowAccount>,
+    #[account(
+        mut,
+        token::mint = escrow.mint,
+        token::authority = escrow
+    )]
+    pub escrow_vault: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        token::mint = escrow.mint,
+        token::authority = sender
+    )]
+    pub sender_token_account: Account<'info, TokenAccount>,
+    #[account(mut, constraint = sender.key() == escrow.sender)]
+    pub sender: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[error_code]
+pub enum EscrowError {
+    #[msg("Escrow already completed")]
+    AlreadyCompleted,
 }
