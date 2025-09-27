@@ -1,0 +1,14 @@
+{
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "typescript.suggest.autoImports": true,
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.suggest.includeAutomaticOptionalChainCompletions": true,
+  "typescript.workspaceSymbols.scope": "allOpenProjects",
+  "files.exclude": {
+    "**/node_modules": false
+  },
+  "search.exclude": {
+    "**/node_modules": true
+  }
+}
