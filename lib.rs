@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::{self, Mint, MintTo, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, Burn, Mint, MintTo, Token, TokenAccount, Transfer};
 
 // This is your program's public key and it will update
 // automatically when you build the project.
@@ -49,6 +49,19 @@ pub mod my_token_program {
 
         msg!("Transfering {} tokens", amount);
         token::transfer(cpi_ctx, amount)
+    }
+
+    pub fn burn_tokens(ctx: Context<BurnTokens>, amount: u64) -> Result<()> {
+        let cpi_accounts: Burn = Burn {
+            mint: ctx.accounts.mint.to_account_info(),
+            from: ctx.accounts.token_account.to_account_info(),
+            authority: ctx.accounts.authority.to_account_info(),
+        };
+        let cpi_ctx: CpiContext<Burn> =
+            CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
+
+        msg!("Burning {} tokens", amount);
+        token::burn(cpi_ctx, amount)
     }
 }
 
@@ -112,6 +125,18 @@ pub struct TransferTokens<'info> {
 
     #[account(mut)]
     pub to: Account<'info, TokenAccount>,
+
+    pub authority: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct BurnTokens<'info> {
+    #[account(mut)]
+    pub mint: Account<'info, Mint>,
+
+    #[account(mut)]
+    pub token_account: Account<'info, TokenAccount>,
 
     pub authority: Signer<'info>,
     pub token_program: Program<'info, Token>,

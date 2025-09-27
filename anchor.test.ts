@@ -225,4 +225,18 @@ describe("my-token-program", () => {
         tokenProgram: TOKEN_PROGRAM_ID,
       })
       .rpc();
+
+    const burnAmount = new anchor.BN(300000);
+    const tx = await program.methods
+      .burnTokens(burnAmount)
+      .accounts({
+        mint: mint.publicKey,
+        tokenAccount: userTokenAccount,
+        authority: provider.wallet.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    console.log("Burn tokens tx:", tx);
+  });
 });
